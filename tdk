@@ -1,4 +1,12 @@
 #!/bin/bash
+
+## DEPENDS ON jq
+## GET IT ON
+## github.com/jqlang/jq
+
+## USES curl '<3'
+## curl.se
+
 word="$*"
 
 if [ -z "$word" ]; then
