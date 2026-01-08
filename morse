@@ -1,0 +1,92 @@
+#!/bin/bash
+## DEPENDS ON SoX
+## GET IT ON
+## github.com/chirlu/sox
+##
+## USES ALSA
+## www.alsa-project.org
+
+
+if [ "$1" == "--help" ] || [ "$1" == "-h" ]; then
+  echo "Live morse code transcriber"
+  exit 1
+fi
+
+# --- 1. Sound Definitions ---
+tone_freq="330"  # Frequency in Hz
+DIT_DURATION="0.05"
+DAH_DURATION="0.15"
+ELEMENT_REST="0.005"
+CHAR_REST="0.05"
+WORD_REST="0.175"
+
+# Define the functions for cleaner execution
+dit() { play -qnt alsa synth "$DIT_DURATION" sine "$tone_freq"; }
+dah() { play -qnt alsa synth "$DAH_DURATION" sine "$tone_freq"; }
+er() { sleep "$ELEMENT_REST"; } # Element Rest
+cr() { sleep "$CHAR_REST"; }   # Character Rest (between letters)
+wr() { sleep "$WORD_REST"; }
+
+echo "-- --- .-. ... .  -.-. --- -.. .  - .-. .- -. ... -.-. .-. .. -... . .-."
+
+while true; do
+    # Read exactly 1 character (-n1) without needing Enter
+    read -n1 char
+    # --- 2. Mapping and Sound Generation ---
+    case "$char" in
+        # A (.-)
+        [aA]) dit; er; dah; cr; ;;
+        # B (-...)
+        [bB]) dah; er; dit; er; dit; er; dit; cr; ;;
+        # C (-.-.)
+        [cC]) dah; er; dit; er; dah; er; dit; cr; ;;
+        # D (-..)
+        [dD]) dah; er; dit; er; dit; cr; ;;
+        # E (.)
+        [eE]) dit; cr; ;;
+        # F (..-.)
+        [fF]) dit; er; dit; er; dah; er; dit; cr; ;;
+        # G (--.)
+        [gG]) dah; er; dah; er; dit; cr; ;;
+        # H (....)
+        [hH]) dit; er; dit; er; dit; er; dit; cr; ;;
+        # I (..)
+        [iI]) dit; er; dit; cr; ;;
+        # J (.---)
+        [jJ]) dit; er; dah; er; dah; er; dah; cr; ;;
+        # K (-.-)
+        [kK]) dah; er; dit; er; dah; cr; ;;
+        # L (.-..)
+        [lL]) dit; er; dah; er; dit; er; dit; cr; ;;
+        # M (--)
+        [mM]) dah; er; dah; cr; ;;
+        # N (-.)
+        [nN]) dah; er; dit; cr; ;;
+        # O (---)
+        [oO]) dah; er; dah; er; dah; cr; ;;
+        # P (.--.)
+        [pP]) dit; er; dah; er; dah; er; dit; cr; ;;
+        # Q (--.-)
+        [qQ]) dah; er; dah; er; dit; er; dah; cr; ;;
+        # R (.-.)
+        [rR]) dit; er; dah; er; dit; cr; ;;
+        # S (...)
+        [sS]) dit; er; dit; er; dit; cr; ;;
+        # T (-)
+        [tT]) dah; cr; ;;
+        # U (..-)
+        [uU]) dit; er; dit; er; dah; cr; ;;
+        # V (...-)
+        [vV]) dit; er; dit; er; dit; er; dah; cr; ;;
+        # W (.--)
+        [wW]) dit; er; dah; er; dah; cr; ;;
+        # X (-..-)
+        [xX]) dah; er; dit; er; dit; er; dah; cr; ;;
+        # Y (-.--)
+        [yY]) dah; er; dit; er; dah; er; dah; cr; ;;
+        # Z (--..)
+        [zZ]) dah; er; dah; er; dit; er; dit; cr; ;;
+        # OTHER
+        *) wr; ;;
+    esac
+done

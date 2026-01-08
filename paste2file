@@ -1,0 +1,12 @@
+#!/bin/bash
+## DEPENDS ON XCLIP
+## GET IT ON
+## github.com/astrand/xclip
+
+if [ -z "$1" ]; then
+  echo "usage: ${0##*/} <FILE_DIR>"
+  echo "Paste your clipboard to file as output"
+  exit 1
+fi
+
+xclip -selection clipboard -o > "${1}"

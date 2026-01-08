@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# 1. Define a dictionary of Country -> Timezone
+declare -A ZONES
+ZONES=(
+    ["germany"]="Europe/Berlin"
+    ["uk"]="Europe/London"
+    ["london"]="Europe/London"
+    ["france"]="Europe/Paris"
+    ["turkey"]="Europe/Istanbul"
+    ["istanbul"]="Europe/Istanbul"
+    ["ny"]="America/New_York"
+    ["nyc"]="America/New_York"
+    ["la"]="America/Los_Angeles"
+    ["sf"]="America/Los_Angeles"
+    ["japan"]="Asia/Tokyo"
+    ["china"]="Asia/Shanghai"
+    ["india"]="Asia/Kolkata"
+    ["sydney"]="Australia/Sydney"
+    ["utc"]="UTC"
+)
+if [ -z "$1" ]; then
+  date +"%H:%M:%S"
+  exit 2
+fi
+# 2. Normalize input to lowercase
+INPUT=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+
+# 3. Check if we have a mapped country
+if [ -n "${ZONES[$INPUT]}" ]; then
+    TARGET_ZONE="${ZONES[$INPUT]}"
+else
+    # If not in our list, try to use the input directly (e.g. if you typed "Europe/Rome")
+    TARGET_ZONE="$1"
+fi
+
+# 4. Display the time using the local `date` command
+# We use `env` to set the TZ variable just for this command
+if env TZ="$TARGET_ZONE" date >/dev/null; then
+    # It's a valid timezone
+    CURRENT_TIME=$(env TZ="$TARGET_ZONE" date +"%H:%M:%S")
+    echo -e "$CURRENT_TIME"
+else
+    echo "Error: Could not find timezone for '$1'."
+    echo "Try using a city/region format like: Europe/Rome"
+fi

@@ -1,0 +1,26 @@
+#!/bin/bash
+word="$*"
+
+if [ -z "$word" ]; then
+  echo "usage: ${0##*/} WORD(s)"
+  echo "tdk api to terminal"
+  echo ""
+  echo "description:"
+  echo "    WORD(s)       any turkish word(s)"
+  exit 1
+fi
+# Fetch data and check if the word exists
+response=$(curl -s -G --data-urlencode "ara=${word}" "https://sozluk.gov.tr/gts")
+
+if echo "$response" | jq -e '.error' >/dev/null 2>&1; then
+  echo "Error: '$word' bulunamadı."
+  exit 1
+fi
+
+responseList=$(echo "$response"| jq -r '.[0].anlamlarListe')
+# Print the word in bold, followed by numbered meanings
+if [ $(echo "$responseList" | jq -r 'length') -ne 1 ]; then
+  echo "$responseList" | jq -r 'to_entries[] | "\(.key + 1). \(.value.anlam)"'
+else
+  echo "$responseList" | jq -r '.[0].anlam'
+fi

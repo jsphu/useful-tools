@@ -1,0 +1,76 @@
+#!/bin/env bash
+## DEPENDS ON tesseract
+## GET IT ON
+## github.com/tesseract-ocr/tesseract
+
+## DEPENDS ON xclip
+## GET IT ON
+## github.com/astrand/xclip
+
+## USES libnotify
+## 'notify-send'
+## github.com/GNOME/libnotify
+
+
+
+# Default language; set what ever you want.
+# Depends on tesseract trained data folder.
+# Look github page for further more details.
+defaultLANG="tur"
+
+# Uses screenshots as default folder
+# Change this to your main screenshots folder.
+lookupDir="$HOME/Pictures/Screenshots"
+
+if [[ "$1" == "-h" ]] || [[ "$1" == "--help" ]]; then
+  COMMANDLINE="${0##*/}"
+  avbl="$(ls /usr/share/tesseract-ocr/5/tessdata/*.traineddata |grep -v $defaultLANG)"
+  availableLangs="$(for i in ${avbl}; do i=${i##*/}; echo -en "${i%%.*} "; done)"
+
+  echo "usage: ${COMMANDLINE} [IMAGE] [LANGUAGE]"
+  echo "Performs OCR and copies to clipboard"
+  echo ""
+  echo "positional arguments:"
+  echo "    [IMAGE]     (default) '${lookupDir}/<recentfile>'"
+  echo "    [LANGUAGE]  (default) $defaultLANG"
+  echo "                others:   $(echo $availableLangs | xargs)"
+  echo ""
+  echo "example:  ${COMMANDLINE} - eng"
+  echo "          ${COMMANDLINE} ~/pictures/cat.png"
+  exit 1
+fi
+
+language="$2"
+
+if [[ -z "$language" ]] || [[ "$language" == "-" ]]; then
+  language=$defaultLANG
+fi
+
+fileOverRide="$1"
+
+if [[ -n "$fileOverRide" ]] && [[ "$fileOverRide" != "-" ]]; then
+  fileName="$fileOverRide"
+else
+  recentFile="$(ls -tr1 $lookupDir |tail -1)"
+  fileName="${lookupDir}/${recentFile}"
+fi
+
+if [ ! -f "$fileName" ]; then
+  notify-send -a "OCR Shot Clip" "Error" "'${fileName}' is neither exists nor an image file!"
+  exit 1
+fi
+
+OCR=$(tesseract "${fileName}" stdout -l $language)
+
+if [ -z "$OCR" ]; then
+  notify-send -a "OCR Shot Clip" "Error" "No text extracted from image."
+  exit 1
+fi
+
+echo -ne "${OCR}"|xclip -selection clipboard
+
+if [ $? -ne 0 ]; then
+  notify-send -a "OCR Shot Clip" "Error" "Failed to send clipboard."
+else
+  notify-send -a "OCR Shot Clip" "Success" "OCR sent to clipboard."
+fi
