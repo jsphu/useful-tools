@@ -1,0 +1,60 @@
+#!/bin/bash
+## DEPENDS ON NVIDIA DRIVERS (FOR GPU)
+
+# Interval in milliseconds (default 1000ms)
+interval=${1:-1000}
+sleep_time=$(awk "BEGIN {print $interval / 1000}")
+# Initial measurement
+prev_stat=$(grep 'cpu ' /proc/stat)
+prev_netw=$(grep 'lo1' /proc/net/dev)
+
+# Main loop
+while true; do
+    sleep "$sleep_time"
+    curr_stat=$(grep 'cpu ' /proc/stat)
+    curr_netw=$(grep 'lo1' /proc/net/dev)
+    # CPU Calculation
+    cpu_usage=$(awk -v prev="$prev_stat" -v curr="$curr_stat" 'BEGIN {
+    split(prev, p); split(curr, c);
+    p_total = p[2]+p[3]+p[4]+p[5]+p[6]+p[7]+p[8]+p[9];
+    p_idle = p[5]+p[6]; # idle + iowait
+    c_total = c[2]+c[3]+c[4]+c[5]+c[6]+c[7]+c[8]+c[9];
+    c_idle = c[5]+c[6];
+
+    diff_total = c_total - p_total;
+    diff_idle = c_idle - p_idle;
+
+    usage = (diff_total - diff_idle) * 100 / diff_total;
+    printf "%.1f%%", usage
+  }')
+    # Network Calculation
+    net_usage=$(awk -v prev="$prev_netw" -v curr="$curr_netw" '
+        function get_size(val) {
+            split("B KiB MiB GiB", units);
+            i = 1;
+            while (val >= 1024 && i < 4) {
+                val /= 1024;
+                i++;
+            }
+            return sprintf("%5.1f %-3s", val, units[i]);
+        }
+        BEGIN {
+            gsub(/:/, " ", prev);
+            gsub(/:/, " ", curr);
+            split(prev, p);
+            split(curr, c);
+
+            rx_speed = (c[2] - p[2]);
+            tx_speed = (c[10] - p[10]);
+
+            printf "Down: %-5s |Up: %-5s", get_size(rx_speed), get_size(tx_speed);
+        }
+    ')
+    ram=$(free -h | awk '/Mem:/ {print $3 "/" $2}')
+    gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo 0)
+    # Print the result on a single updating line
+    printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |%s  " "$cpu_usage" "$ram" "$gpu" "$net_usage"
+    # Update variables for next loop
+    prev_stat="$curr_stat"
+    prev_netw="$curr_netw"
+done
