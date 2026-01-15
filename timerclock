@@ -1,0 +1,67 @@
+#!/usr/bin/env python3
+import sys
+import time
+import argparse
+import subprocess
+from datetime import datetime, timedelta
+
+def notify(message):
+    """Sends a system notification (Linux)."""
+    try:
+        subprocess.run(["notify-send", "-a", "TimerClock", message], check=False)
+    except FileNotFoundError:
+        print("libnotify is not found in your environment. Are you are on Linux?")
+        """I DO NOT USE MAC"""
+        # try:
+        #     subprocess.run(["osascript", "-e", f'display notification "{message}" with title "TimerClock"'], check=False)
+        # except FileNotFoundError:
+        #     print(f"\nALARM: {message}")
+
+def format_seconds(s):
+    """Converts seconds into HH:MM:SS."""
+    h = s // 3600
+    m = (s % 3600) // 60
+    s = s % 60
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+def main():
+    parser = argparse.ArgumentParser(description="displays clock for remain time, works as a timer")
+    parser.add_argument("seconds", type=int, nargs="?", default=60, help="Seconds to count down")
+    parser.add_argument("-f", "--freeze", action="store_true", help="Displays timer as stopped")
+    parser.add_argument("-t", "--target", type=str, help="Calculates remaining timer for specific date/time (e.g., '13:30' or '2026-01-15')")
+    parser.add_argument("-a", "--alarm", action="store_true", help="Alarms (notifies) when timer is stopped")
+
+    args = parser.parse_args()
+
+    if args.target:
+        try:
+            args.target.replace('/', '-')
+            if ":" in args.target and len(args.target) <= 8:
+                t_obj = datetime.strptime(args.target, "%H:%M")
+                target_dt = datetime.now().replace(hour=t_obj.hour, minute=t_obj.minute, second=0, microsecond=0)
+                if target_dt < datetime.now():
+                    target_dt += timedelta(days=1)
+            else:
+                target_dt = datetime.fromisoformat(args.target.replace(" ", "T"))
+            diff = int((target_dt - datetime.now()).total_seconds())
+        except ValueError:
+            print("Error: Target format should be 'HH:MM' or 'YYYY-MM-DD HH:MM:SS'")
+            sys.exit(1)
+    else:
+        diff = args.seconds
+
+    # Start Timer Logic
+    try:
+        while diff >= 0:
+            print(f"\r{format_seconds(diff)} ", end="", flush=True)
+            if args.freeze or diff == 0:
+                break
+            time.sleep(1)
+            diff -= 1
+        if diff <= 0 and args.alarm:
+            notify("Time is up!")
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+if __name__ == "__main__":
+    main()

@@ -54,8 +54,11 @@ function get_bigger {
 }
 
 function sub_time {
-  local time1=$1
-  local time2=$2
+  local t1=${1/#-/}
+  local t2=${2/#-/}
+  local cdate="$(date +%T)"
+  local time1=${t1:-$cdate}
+  local time2=${t2:-$cdate}
   local long_time="$(get_bigger $time1 $time2)"
   local bigger=$(parse_time $(echo $long_time|cut -d' ' -f1))
   local smaller=$(parse_time $(echo $long_time|cut -d' ' -f2))
@@ -68,6 +71,8 @@ function sub_time {
 if [ $# -ne 2 ]; then
   echo "usage: ${0##*/} [HH:MM:SS] [HH:MM:SS]"
   echo "Subtracts time while preserves formatting"
+  echo ""
+  echo "protip: Use '-' as current datetime"
   exit 2
 fi
 
