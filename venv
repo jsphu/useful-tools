@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+## This script recursively locates Python virtual
+## environments within the current directory and
+## offers an interactive, self-cleaning prompt to
+## select one. When sourced, it automatically activates
+## the chosen environment directly in your active shell session.
+## If you'd like to, just use the echoed output to source it
+
+OPTIND=1
+timeOutInSeconds=10
+doNotPrint=""
+
+while getopts ":t:ph" opt; do
+  case "${opt}" in
+    t)
+      timeOutInSeconds=${OPTARG}
+      ;;
+    p)
+      doNotPrint="y"
+      ;;
+    h)
+      echo "usage: findvenv [-t TIMEOUT] [-p] [-h]"
+      echo "Sources and finds virtualenvs from your directory"
+      echo ""
+      echo "Options:"
+      echo "  -t TIMEOUT   (default: 10) specify a timeout (sec) for to look"
+      echo "  -p           do not print source -- .. lines at the end"
+      echo "  -h           prints this usage and exits"
+      return 0 || exit 0
+      ;;
+    \?)
+      echo "Error: -${OPTARG} is not an option"
+      return 2 || exit 2
+      ;;
+    :)
+      echo "Error: -${OPTARG} requires an argument"
+      return 2 || exit 2
+      ;;
+  esac
+done
+shift $((OPTIND -1))
+
+readarray -t paths < <(timeout ${timeOutInSeconds} find "$PWD" -path "*/bin/activate" 2>/dev/null)
+
+pathscount=${#paths[@]}
+
+if [[ ${pathscount} -eq 0 ]]; then
+    [[ -z ${doNotPrint} ]] && echo "No venv found."
+    return 1 2>/dev/null || exit 1
+fi
+
+if [[ ${pathscount} -gt 1 ]]; then
+    for p in "${paths[@]}"; do
+        relative_p="./${p#"${PWD}"/}"
+        echo -n "Source ${relative_p}? [y/n]: " >/dev/stderr
+        read -r isYes
+        # UI Cleanup: Move up and clear the prompt line
+        echo -ne "\033[1A\033[2K" >/dev/stderr
+        if [[ ${isYes,,} =~ ^y ]]; then
+            source -- "${p}"
+            [[ -z ${doNotPrint} ]] && echo "source -- ${relative_p}"
+            return 0 2>/dev/null || exit 0
+        fi
+    done
+else
+    p="${paths[0]}"
+    relative_p="./${p#"${PWD}"/}"
+    source -- "${p}"
+    [[ -z ${doNotPrint} ]] && echo "source -- ${relative_p}"
+fi
