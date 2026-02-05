@@ -7,6 +7,7 @@ sleep_time=$(awk "BEGIN {print $interval / 1000}")
 # Initial measurement
 prev_stat=$(grep 'cpu ' /proc/stat)
 prev_netw=$(grep 'lo1' /proc/net/dev)
+printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |Down:   %-7s |Up:   %-7s  " "0.0" "0Gi/0Gi" "00" "0.0 B" "0.0 B"
 
 # Main loop
 while true; do
