@@ -1,0 +1,269 @@
+#!/usr/bin/env bash
+## Basic alarmer with notify-send and paplay (audio)
+## Depends on libnotify (notify-send)
+## Depends on paplay (change whatever you have)
+## Depends on LinuxMint sounds (change whatever you have)
+## Tested on Bash 5.3.9
+declare -A CONFIG=(
+    ["AudioManager"]=paplay
+    ["NotifyManager"]=notify-send
+    ["SoundInfo"]=/usr/share/sounds/LinuxMint/stereo/dialog-question.ogg
+    ["SoundBuzz"]=/usr/share/sounds/LinuxMint/stereo/dialog-question.wav
+    ["SoundDumm"]=/usr/share/sounds/LinuxMint/stereo/dialog-warning.ogg
+)
+if ! command -v "${CONFIG['AudioManager']}" 2>&1 >/dev/null; then
+    printf "Warning: '%s' not found. Needed for sounds\n" "${CONFIG['AudioManager']}"
+    printf "Please install or change on config.\n"
+fi
+
+if ! command -v "${CONFIG['NotifyManager']}" 2>&1 >/dev/null; then
+    printf "Error: '%s' not found. Notifications are critical for alarms.\n" "${CONFIG['NotifyManager']}"
+    printf "Please install or change it.\n"
+    exit 2
+fi
+[[ $0 =~ -bash$ || ! $0 =~ basicalarm ]] && SCRIPTNAME="basicalarm" || SCRIPTNAME="${0##*/}"
+SCRIPTPATH="${SCRIPTS_DIR:-$HOME/.scripts}/${SCRIPTNAME}"
+
+function sm {
+    local info=${CONFIG['SoundInfo']}
+    local buzz=${CONFIG['SoundBuzz']}
+    local dumm=${CONFIG['SoundDumm']}
+    local file="/tmp/${SCRIPTNAME}"
+    local pid=$(cat ${file}.pid 2>/dev/null)
+    local option="$1"
+    local seconds="$2"
+    local message="$3"
+    case "$option" in
+        alarm)
+            if [[ -z $seconds ]]; then
+                return 1
+            elif ! ps -p ${pid} >/dev/null 2>&1; then
+                cat >${file} <<EOF
+#!/usr/bin/env bash
+message='${message}'
+sleep $seconds
+$SCRIPTPATH "SUB-\${message}" &
+for i in {1..500}; do
+    ${CONFIG['AudioManager']} $buzz
+    sleep 0.8
+done
+EOF
+                chmod +x ${file}
+                ${file} &
+                echo $! >${file}.pid
+            else
+                return 1
+            fi
+            ;;
+        kill)
+            if ps -p ${pid} >/dev/null 2>&1; then
+                kill -15 ${pid}
+                rm -f ${file:-/tmp/basicalarm} ${file}.pid
+            else
+                return 1
+            fi
+            ;;
+        info)
+            ${CONFIG['AudioManager']} $info;;
+        dumm)
+            ${CONFIG['AudioManager']} $dumm;;
+        buzz)
+            ${CONFIG['AudioManager']} $buzz;;
+    esac
+}
+
+function notify {
+    sm info &
+    sleep 0.1
+    if (($# == 4)); then
+        ${CONFIG['NotifyManager']} "$1" "$2" -A true="$3" -A false="$4" --urgency=critical -a basicalarm -i alarm
+    elif (($# == 2)); then
+        ${CONFIG['NotifyManager']} "$1" "$2" -i alarm -a basicalarm
+    else
+        ${CONFIG['NotifyManager']} "$1" -i alarm -a basicalarm
+    fi
+}
+
+function handlemath {
+    local float="${1//,/.}"
+    local acc="${2:-1}"
+    local result=$(<<<"scale=0; ${float} * ${acc} / 1" bc -l 2>/dev/null)
+    echo ${result:-0}
+}
+
+function timefmt {
+    local seconds=$1
+    if ((60 > seconds)); then
+        printf '%(%-S)T seconds' "$seconds"
+    elif ((120 > seconds)); then
+        printf '1 minute'
+    elif ((3600 > seconds)); then
+        printf '%(%-M)T minutes' "$seconds"
+    elif ((7200 > seconds)); then
+        printf '1 hour'
+    elif ((86400 > seconds)); then
+        printf '%s hours' "$((seconds / 60 / 60))"
+    else
+        printf 'too long at %(%c)T' "$seconds"
+    fi
+}
+
+function alarmer {
+    local seconds=$1
+    local message=$2
+    local header="Alarm Set!"
+    local lower
+    if [[ -n $TYPE && -n $ORIGINAL_SECOND ]]; then
+        lower="for $ORIGINAL_SECOND $TYPE"
+    else
+        lower="for $(timefmt $seconds)."
+    fi
+    sm kill
+    if (($(handlemath $seconds) > 0)); then
+        notify "$header" "$lower"
+        sm dumm
+    fi
+    sm alarm "$seconds" "${message}"
+}
+
+function subalarmer {
+    local message="${1/SUB-/}"
+    silence=$(notify "${message:-ALARM!!!}" "Silence or snooze it for 10 minutes." "silence" "snooze")
+    sm kill
+    if $silence; then
+        exit
+    else
+        alarmer 600 "${message}"
+    fi
+}
+
+HELP=false
+TYPE=
+DATE=
+KILL=false
+MESG=
+CRON=false
+DELE=false
+while getopts ":ht:d:km:cC" opt; do
+    case "$opt" in
+        \?)
+            echo "Error: Unkown option '-$OPTARG'"
+            exit 2;;
+        h)
+            HELP=true;;
+        t)
+            TYPE="${OPTARG}";;
+        d)
+            DATE="${OPTARG}";;
+        k)
+            KILL=true;;
+        m)
+            MESG="${OPTARG}";;
+        c)
+            CRON=true;;
+        C)
+            DELE=true;;
+    esac
+done
+shift $((OPTIND - 1))
+ORIGINAL_SECOND=${1}
+SECOND=${ORIGINAL_SECOND}
+
+if $HELP; then
+    cat <<EOF
+usage: basicalarm [options] [at DATE | SECONDS]
+
+positional:
+    at DATE         set an alarm at given date, same as -d
+    SECONDS         set seconds to alarm after
+
+options:
+    -h              show usage
+    -t  TYPE        set time type (e.g. hours, minutes etc.)
+    -d  DATE        set date string instead
+    -k              abort the alarm if running otherwise returns false
+    -m  MESSAGE     set a message to display
+    -c              schedule alarm for every day (sets a cronjob)
+    -C              unschedule alarms (reverses -c)
+EOF
+    exit 0
+elif $KILL; then
+    sm kill
+    exit
+elif [[ -n $DATE || $1 == at && -n $2 ]]; then
+    if [[ $1 == at ]]; then
+        SECOND=
+        DATE=$2
+    fi
+    TARGETSECONDS=$(date +%s --date="$DATE" 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "Error: '$DATE' is an invalid date string."
+        echo "Check 'man date' for valid date strings."
+        exit 2
+    fi
+    SECOND=$((TARGETSECONDS - EPOCHSECONDS))
+    if ((SECOND < 0)); then
+        echo "Error: given date is not in future."
+        exit 2
+    fi
+elif [[ -z $SECOND ]] && ! $DELE; then
+    echo "usage: basicalarm [-hcCk] [-d DATE] [-t TYPE] [-m MSG] [at DATE | SECONDS]"
+    exit 2
+elif [[ -n $TYPE ]]; then
+    case ${TYPE,,} in
+        sec|s|seconds|second)
+            SECOND="scale=3; $SECOND"
+            ACC=1;;
+        ms|milliseconds|milli|millisecond)
+            SECOND="scale=3; $SECOND"
+            ACC="1/1000";;
+        minute|minutes|min|mins|m)
+            ACC=60;;
+        hour|hours|h)
+            ACC=$((60 * 60));;
+        15|quarter|quarters)
+            ACC=$((60 * 15));;
+        30|half|halves)
+            ACC=$((60 * 30));;
+        69|420|r|random|rand|iamfeelinglucky)
+            ACC=$((RANDOM / ${SECOND:-1}));;
+        *)
+            echo "Error: Unkown type '$TYPE'"
+            exit 2;;
+    esac
+    SECOND=$(handlemath "$SECOND" "$ACC")
+fi
+
+if $CRON && ! $DELE; then
+    [[ -n $DATE ]] && time=$(date +%s --date="$DATE") || time=$((EPOCHSECONDS + SECOND))
+    printf -v crontime "%(%M %H)T * * *" "$time"
+    printf -v prettytime "Scheduled to: %(%H:%M)T, with message '%s'" "$time" "$MESG"
+    alarmcmd="export DISPLAY=:0; export XDG_RUNTIME_DIR=/run/user/$(id -u); export DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u)/bus; /bin/bash $SCRIPTPATH -m '$MESG' 0"
+    (crontab -l 2>/dev/null; echo "$crontime $alarmcmd") | crontab -
+    exit_status=${PIPESTATUS[0]}
+    ((exit_status == 0)) && echo "Cronjob added. ${prettytime}" || echo "Error: program returned ${exit_status}"
+    exit $exit_status
+fi
+if $DELE; then
+    tmpfifo=$(mktemp temp_fifo.XXXXX)
+    crontab -l 2>/dev/null| tee >(grep -c "${SCRIPTPATH}" > "${tmpfifo}")\
+        | grep -v "$SCRIPTPATH" | crontab -
+    removed_jobs=$(cat "${tmpfifo}")
+    ((removed_jobs <= 0)) && removed_jobs="No"
+    rm "${tmpfifo}"
+    exit_status=$?
+    echo "$removed_jobs cronjob removed."
+    exit $exit_status
+fi
+
+if [[ $SECOND =~ ^SUB ]]; then
+    subalarmer "$SECOND"
+elif [[ $SECOND =~ ^[0-9]*[,.][0-9]+$ && -z $TYPE ]]; then
+    echo "Error: without -t, '$SECOND' must be integer."
+    exit 2
+elif [[ ! $SECOND =~ ^[0-9]+$ && ! $SECOND =~ ^[0-9]*[,.][0-9]+$ ]]; then
+    echo "Error: '$SECOND' is not a number"
+    exit 2
+else
+    alarmer $SECOND "${MESG}" &
+fi
