@@ -29,11 +29,14 @@ def main():
     parser.add_argument("seconds", type=int, nargs="?", default=60, help="Seconds to count down")
     parser.add_argument("-f", "--freeze", action="store_true", help="Displays timer as stopped")
     parser.add_argument("-t", "--target", type=str, help="Calculates remaining timer for specific date/time (e.g., '13:30' or '2026-01-15')")
+    parser.add_argument("-r", "--reversed", action="store_true", help="Incrementing the timer, acts as a chronometer. overrides all options")
     parser.add_argument("-a", "--alarm", action="store_true", help="Alarms (notifies) when timer is stopped")
 
     args = parser.parse_args()
 
-    if args.target:
+    if args.reversed:
+        diff = 0
+    elif args.target:
         try:
             args.target.replace('/', '-')
             if ":" in args.target and len(args.target) <= 8:
@@ -52,15 +55,22 @@ def main():
 
     # Start Timer Logic
     try:
-        while diff >= 0:
-            print(f"\r{format_seconds(diff)} ", end="", flush=True)
-            if args.freeze or diff == 0:
-                break
-            time.sleep(1)
-            diff -= 1
-        if diff <= 0 and args.alarm:
-            notify("Time is up!")
+        if args.reversed:
+            while True:
+                print(f"\r{format_seconds(diff)} ", end="", flush=True)
+                time.sleep(1)
+                diff += 1
+        else:
+            while diff >= 0:
+                print(f"\r{format_seconds(diff)} ", end="", flush=True)
+                if args.freeze or diff == 0:
+                    break
+                time.sleep(1)
+                diff -= 1
+            if diff <= 0 and args.alarm:
+                notify("Time is up!")
     except KeyboardInterrupt:
+        print()
         sys.exit(0)
 
 if __name__ == "__main__":

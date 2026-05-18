@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+
+# example:
+#     import only_this as new_name from script_without_extension in /path/to/script
+#     import script.sh
+#     import script
+#     import script in /lib
+#     import lib # this imports either lib/main.sh or lib/main.bash or lib/index.sh or lib/index.bash or lib.sh or lib.bash or lib
+#     import func from lib in usr as usr_lib_func
+import() {
+  local ONLY="" AS="" FROM_FILE="" IN_DIR=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+    as)
+      AS="$2"
+      shift 2
+      ;;
+    from)
+      FROM_FILE="$2"
+      shift 2
+      ;;
+    in)
+      IN_DIR="$2"
+      shift 2
+      ;;
+    *)
+      if [ -z "$ONLY" ]; then
+        ONLY="$1"
+      else
+        echo "Error: Unexpected argument '$1'" >&2
+        return 2
+      fi
+      shift
+      ;;
+    esac
+  done
+
+  local target=""
+  if [ -n "$FROM_FILE" ]; then
+    target="$FROM_FILE"
+  else
+    target="$ONLY"
+    ONLY=""
+  fi
+
+  [ -z "$target" ] && {
+    echo "Error: No target file or directory specified" >&2
+    return 1
+  }
+
+  if [ -n "$IN_DIR" ]; then
+    eval IN_DIR="$IN_DIR"
+    [[ "$IN_DIR" != */ ]] && IN_DIR="$IN_DIR/"
+    target="${IN_DIR}${target}"
+  else
+    eval target="$target"
+  fi
+
+  __source_file() {
+    local file="$1"
+    if [ -n "$ONLY" ]; then
+      local func_def
+      func_def=$(bash -c ". '$file' 2>/dev/null; declare -f '$ONLY'")
+
+      if [ -n "$func_def" ]; then
+        if [ -n "$AS" ]; then
+          func_def=$(echo "$func_def" | sed "1s/^$ONLY[[:space:]]*()/$AS ()/")
+        fi
+        eval "$func_def"
+      else
+        echo "Warning: Function '$ONLY' not found in $file" >&2
+      fi
+    else
+      source "$file"
+    fi
+  }
+
+  if [ -d "$target" ]; then
+    for f in "$target"/{main,index}{.bash,.sh}; do
+      if [ -s "$f" ]; then
+        __source_file "$f"
+        return 0
+      fi
+    done
+    echo "Error: No main/index .sh/.bash files found in directory $target" >&2
+    return 1
+  else
+    if [ -s "$target" ]; then
+      __source_file "$target"
+    elif [ -s "$target.sh" ]; then
+      __source_file "$target.sh"
+    elif [ -s "$target.bash" ]; then
+      __source_file "$target.bash"
+    else
+      echo "Error: Target '$target' not found" >&2
+      return 1
+    fi
+  fi
+}
+
+# same logic with above, but only with flags
+_import() {
+  local OPTIND=1 ALL=false BASHRC_D_LIB=false GIT_LIB=false ONLY="" AS=""
+
+  while getopts "abgo:r:" opt; do
+    case "$opt" in
+    a) ALL=true ;;
+    b) BASHRC_D_LIB=true ;;
+    g) GIT_LIB=true ;;
+    o) ONLY="$OPTARG" ;;
+    r) AS="$OPTARG" ;;
+    *) return 2 ;;
+    esac
+  done
+  shift $((OPTIND - 1))
+
+  local target="$1"
+  [ -z "$target" ] && {
+    echo "Error: No target specified" >&2
+    return 1
+  }
+
+  if [ -n "$AS" ] && [ -z "$ONLY" ]; then
+    echo "Error: Cannot use alias (-r) without specifying a function (-o)" >&2
+    return 1
+  fi
+
+  local base_dir=""
+  if $BASHRC_D_LIB; then
+    base_dir="$HOME/.bashrc.d/"
+  elif $GIT_LIB; then
+    base_dir="$HOME/git/"
+  fi
+  target="${base_dir}${target}"
+
+  __source_file() {
+    local file="$1"
+    if [ -n "$ONLY" ]; then
+      # Extract the function via an isolated subshell
+      local func_def
+      func_def=$(bash -c ". '$file' 2>/dev/null; declare -f '$ONLY'")
+
+      if [ -n "$func_def" ]; then
+        # If an alias (-r) was provided, rename the function definition using sed
+        if [ -n "$AS" ]; then
+          # Matches the function name at the start of the declaration and replaces it
+          func_def=$(echo "$func_def" | sed "1s/^$ONLY[[:space:]]*()/$AS ()/")
+        fi
+        eval "$func_def"
+      else
+        echo "Warning: Function '$ONLY' not found in $file" >&2
+      fi
+    else
+      source "$file"
+    fi
+  }
+
+  if [ -d "$target" ]; then
+    if $ALL; then
+      local found=false
+      for script in "$target"/*.{sh,bash}; do
+        if [ -s "$script" ]; then
+          __source_file "$script"
+          found=true
+        fi
+      done
+      $found || {
+        echo "Error: No .sh or .bash files found in $target" >&2
+        return 1
+      }
+    else
+      for f in "$target"/{main,index}{.bash,.sh}; do
+        if [ -s "$f" ]; then
+          __source_file "$f"
+          return 0
+        fi
+      done
+      echo "Error: No main/index .sh/.bash files found in $target" >&2
+      return 1
+    fi
+  else
+    if [ -s "$target" ]; then
+      __source_file "$target"
+    elif [ -s "$target.sh" ]; then
+      __source_file "$target.sh"
+    elif [ -s "$target.bash" ]; then
+      __source_file "$target.bash"
+    else
+      echo "Error: Target '$target' not found" >&2
+      return 1
+    fi
+  fi
+}
