@@ -26,7 +26,7 @@ Displays time for a specific timezone or country.
 
 ```bash
 utc germany
-utc 13:30  # Displays current local time if no arg (wait, code says if -z $1 it shows time)
+utc 13:30  # Displays current local time if no arg
 ```
 
 ### `paste2file`
