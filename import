@@ -99,8 +99,8 @@ import() {
   fi
 }
 
-# same logic with above, but only with flags
-_import() {
+# same logic with "import", but only with flags
+include() {
   local OPTIND=1 ALL=false BASHRC_D_LIB=false GIT_LIB=false ONLY="" AS=""
 
   while getopts "abgo:r:" opt; do

@@ -16,3 +16,4 @@
 !venv
 !basicalarm
 !import
+!log.bash

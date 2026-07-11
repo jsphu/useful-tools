@@ -1,21 +1,21 @@
-#!/bin/bash
+#!/usr/bin/env bash
 ## DEPENDS ON NVIDIA DRIVERS (FOR GPU)
 
 # Interval in milliseconds (default 1000ms)
-interval=${1:-1000}
+interval=${1:-1000} LOOP=true
+if [[ "$interval" == "-i" ]]; then
+  LOOP=false
+fi
 sleep_time=$(awk "BEGIN {print $interval / 1000}")
 # Initial measurement
 prev_stat=$(grep 'cpu ' /proc/stat)
 prev_netw=$(grep 'lo1' /proc/net/dev)
-printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |Down:   %-7s |Up:   %-7s  " "0.0" "0Gi/0Gi" "00" "0.0 B" "0.0 B"
 
-# Main loop
-while true; do
-    sleep "$sleep_time"
-    curr_stat=$(grep 'cpu ' /proc/stat)
-    curr_netw=$(grep 'lo1' /proc/net/dev)
-    # CPU Calculation
-    cpu_usage=$(awk -v prev="$prev_stat" -v curr="$curr_stat" 'BEGIN {
+loop() {
+  curr_stat=$(grep 'cpu ' /proc/stat)
+  curr_netw=$(grep 'lo1' /proc/net/dev)
+  # CPU Calculation
+  cpu_usage=$(awk -v prev="$prev_stat" -v curr="$curr_stat" 'BEGIN {
     split(prev, p); split(curr, c);
     p_total = p[2]+p[3]+p[4]+p[5]+p[6]+p[7]+p[8]+p[9];
     p_idle = p[5]+p[6]; # idle + iowait
@@ -28,8 +28,8 @@ while true; do
     usage = (diff_total - diff_idle) * 100 / diff_total;
     printf "%.1f%%", usage
   }')
-    # Network Calculation
-    net_usage=$(awk -v prev="$prev_netw" -v curr="$curr_netw" '
+  # Network Calculation
+  net_usage=$(awk -v prev="$prev_netw" -v curr="$curr_netw" '
         function get_size(val) {
             split("B KiB MiB GiB", units);
             i = 1;
@@ -51,11 +51,18 @@ while true; do
             printf "Down: %-5s |Up: %-5s", get_size(rx_speed), get_size(tx_speed);
         }
     ')
-    ram=$(free -h | awk '/Mem:/ {print $3 "/" $2}')
-    gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo 0)
-    # Print the result on a single updating line
-    printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |%s  " "$cpu_usage" "$ram" "$gpu" "$net_usage"
-    # Update variables for next loop
-    prev_stat="$curr_stat"
-    prev_netw="$curr_netw"
-done
+  ram=$(free -h | awk '/Mem:/ {print $3 "/" $2}')
+  gpu=$(nvidia-smi --query-gpu=utilization.gpu --format=csv,noheader,nounits 2>/dev/null || echo 0)
+  # Print the result on a single updating line
+  printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |%s  " "$cpu_usage" "$ram" "$gpu" "$net_usage"
+  # Update variables for next loop
+  prev_stat="$curr_stat"
+  prev_netw="$curr_netw"
+}
+# Main loop
+if $LOOP; then
+  printf "\rCPU: %-6s|RAM: %-10s |GPU: %3s%% |Down:   %-7s |Up:   %-7s  " "0.0" "0Gi/0Gi" "00" "0.0 B" "0.0 B"
+  while sleep "$sleep_time"; do loop; done
+else
+  loop # run once and exits.
+fi
