@@ -48,7 +48,7 @@ log() {
     if [[ -n "$message" ]]; then
       column=": "
     fi
-    printf -v HEADER '%b[%(%d-%m-%Y %H:%M:%S)T][%s]%s%b' "${COLOR/1/0}" "$EPOCHSECONDS" "${BANNER}" "$column" "${NC}"
+    printf -v HEADER '%b[%(%d-%m-%Y %H:%M:%S)T.%s][%s]%s%b' "${COLOR/1/0}" "$EPOCHSECONDS" "${EPOCHREALTIME##*,}" "${BANNER}" "$column" "${NC}"
   fi
   printf "%b%b%b\n" "$HEADER" "${message}" "${NC}"
 }
