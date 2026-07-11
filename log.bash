@@ -1,6 +1,6 @@
 log() {
-  local RED="\033[1;31m" YLW="\033[1;33m" GRN="\033[1;32m" NC="\033[0m"
-  local BLU="\033[1;34m" MAG="\033[1;35m" CYN="\033[1;36m"
+  local RED="\033[31m" YLW="\033[33m" GRN="\033[32m" NC="\033[0m"
+  local BLU="\033[34m" MAG="\033[35m" CYN="\033[36m"
 
   # Global Quiet Flag
   if [[ "$LOGQUIETMODE" == "1" ]]; then
@@ -42,13 +42,14 @@ log() {
   message="${message//\[B\]/${BLU}}"
   message="${message//\[M\]/${MAG}}"
   message="${message//\[C\]/${CYN}}"
-  message="${message//\[\]/${NC}}"
+  message="${message//\[W\]/${NC}}"
+  message="${message//\[\]/${COLOR}}"
 
   if [[ -n "$BANNER" && -n "$COLOR" ]]; then
     if [[ -n "$message" ]]; then
       column=": "
     fi
-    printf -v HEADER '%b[%(%d-%m-%Y %H:%M:%S)T.%s][%s]%s%b' "${COLOR/1/0}" "$EPOCHSECONDS" "${EPOCHREALTIME##*,}" "${BANNER}" "$column" "${NC}"
+    printf -v HEADER '%b[%(%d-%m-%Y %H:%M:%S)T.%s][%s]%s' "${COLOR/1/0}" "$EPOCHSECONDS" "${EPOCHREALTIME##*,}" "${BANNER}" "$column"
   fi
-  printf "%b%b%b\n" "$HEADER" "${message}" "${NC}"
+  printf "%b\033[1m%b%b\n" "$HEADER" "${message}" "${NC}"
 }
