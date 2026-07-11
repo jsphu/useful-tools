@@ -106,7 +106,7 @@ source import
 import myfunc from script in ./lib as newfunc
 ```
 
-### log
+### `log`
 
 Logger utility for scripts with color-coded language support and works as a timer
 
