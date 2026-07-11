@@ -108,10 +108,10 @@ import myfunc from script in ./lib as newfunc
 
 ### `log`
 
-Logger utility for scripts with color-coded language support and works as a timer
+Logger utility for scripts with color-coded language support
 
-```bash
-source log.bash
+```sh
+. log.sh
 log -b BANNER -c COLOR_CODE "Hello world! [R]this is a red text.[] now normal, [G]green text.[] etc."
 ```
 
