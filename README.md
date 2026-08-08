@@ -9,6 +9,8 @@ Logger utility for scripts with color-coded language support
 ```sh
 . log.sh
 log -b BANNER -c (r|g|b|y|w|m|c) "Hello world! [R]this is a red text.[] now default color, [G]green text.[] etc."
+# works on log.bash, log.sh is not supports these yet.
+source log.bash # source first
 LOGQUIETMODE=0 # silence any log when set to 1
 LOGALWAYSCOLOR=0 # force color output when set to 1
 LOGNOCOLOR=0 # force no color output when set to 1
