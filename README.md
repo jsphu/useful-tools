@@ -2,6 +2,21 @@
 
 Here is some of them with their usages.
 
+### `log`
+
+Logger utility for scripts with color-coded language support
+
+```sh
+. log.sh
+log -b BANNER -c (r|g|b|y|w|m|c) "Hello world! [R]this is a red text.[] now default color, [G]green text.[] etc."
+LOGQUIETMODE=0 # silence any log when set to 1
+LOGALWAYSCOLOR=0 # force color output when set to 1
+LOGNOCOLOR=0 # force no color output when set to 1
+LOGLEVEL=0 # set levels to see upper level log messages
+log -l1 "Level 1" # won't seen on LOGLEVEL=0
+log -l2 "Level 2" # won't seen below LOGLEVEL=2 etc.
+```
+
 ### `subtime`
 
 Subtracts time while preserving formatting.
@@ -104,15 +119,6 @@ Modular script/function importing for Bash.
 ```bash
 source import
 import myfunc from script in ./lib as newfunc
-```
-
-### `log`
-
-Logger utility for scripts with color-coded language support
-
-```sh
-. log.sh
-log -b BANNER -c COLOR_CODE "Hello world! [R]this is a red text.[] now normal, [G]green text.[] etc."
 ```
 
 ## License

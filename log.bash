@@ -2,13 +2,22 @@ log() {
   local ESC=$'\033'
   local RED="${ESC}[31m" YLW="${ESC}[33m" GRN="${ESC}[32m" BLU="${ESC}[34m"
   local MAG="${ESC}[35m" CYN="${ESC}[36m" BOLD="${ESC}[1m" NC="${ESC}[0m"
+  if [[ "$LOGALWAYSCOLOR" != "1" && ! -t 1 || "$LOGNOCOLOR" == "1" ]]; then
+    RED= YLW= GRN= BLU= MAG= CYN= BOLD= NC=
+  fi
 
   if [ "$LOGQUIETMODE" = "1" ]; then
     return 0
   fi
 
-  local OPTIND=1 BANNER="$0" COLOR="$YLW" column=""
-  while getopts "hb:c:e" opt; do
+  if [ -z "$LOGLEVEL" ]; then
+    LOGLEVEL=0
+  fi
+
+  local BANNER="${LOGBANNER:-$0}"
+
+  local OPTIND=1 COLOR="$BLU" column="" LEVEL=0
+  while getopts "hb:c:el:" opt; do
     case "$opt" in
     h)
       echo "Usage: log [-he] [-b BANNER] [-c COLOR] <message> <message>..."
@@ -27,6 +36,7 @@ log() {
       esac
       ;;
     e) BANNER="" COLOR="" ;;
+    l) LEVEL="$OPTARG" ;;
     *)
       echo "Invalid option: -$OPTARG" >&2
       return 1
@@ -34,6 +44,10 @@ log() {
     esac
   done
   shift $((OPTIND - 1))
+
+  if [[ "$LOGLEVEL" -lt "$LEVEL" ]]; then
+    return 0
+  fi
 
   local message="$*"
 
@@ -47,16 +61,15 @@ log() {
   message="${message//\[\]/${COLOR}}"
 
   local HEADER=""
-  if [ -n "$BANNER" ] && [ -n "$COLOR" ]; then
+  if [ -n "$BANNER" ]; then
     if [ -n "$message" ]; then
       column=": "
     fi
 
-    local COLOR_CLEAN=${COLOR//1/0}
     LC_ALL=C printf -v TIMESTAMP "%(%d-%m-%Y %H:%M:%S)T.%s" "$EPOCHSECONDS" "${EPOCHREALTIME##*,}"
 
-    HEADER="${COLOR_CLEAN}[${TIMESTAMP}][${BANNER}]${column}"
+    HEADER="${COLOR}[${TIMESTAMP}][${BANNER}]${column}"
   fi
 
-  printf "%s%s%s%s\n" "$HEADER" "${BOLD}" "${message}" "${NC}"
+  printf "%s%s%s%s\n" "$HEADER" "${BOLD}" "$(echo -e "$message")" "${NC}"
 }
