@@ -16,8 +16,8 @@ log() {
 
   local BANNER="${LOGBANNER:-$0}"
 
-  local OPTIND=1 COLOR="$BLU" column="" LEVEL=0
-  while getopts "hb:c:el:" opt; do
+  local OPTIND=1 COLOR="$BLU" column="" LEVEL=0 NEWLINE=$'\n'
+  while getopts "hb:c:el:n" opt; do
     case "$opt" in
     h)
       echo "Usage: log [-he] [-b BANNER] [-c COLOR] <message> <message>..."
@@ -37,6 +37,7 @@ log() {
       ;;
     e) BANNER="" COLOR="" ;;
     l) LEVEL="$OPTARG" ;;
+    n) NEWLINE="" ;;
     *)
       echo "Invalid option: -$OPTARG" >&2
       return 1
@@ -71,5 +72,5 @@ log() {
     HEADER="${COLOR}[${TIMESTAMP}][${BANNER}]${column}"
   fi
 
-  printf "%s%s%b%s\n" "$HEADER" "${BOLD}" "$message" "${NC}"
+  printf "%s%s%b%s%b" "$HEADER" "${BOLD}" "$message" "${NC}" "$NEWLINE"
 }
