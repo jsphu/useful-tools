@@ -71,5 +71,5 @@ log() {
     HEADER="${COLOR}[${TIMESTAMP}][${BANNER}]${column}"
   fi
 
-  printf "%s%s%s%s\n" "$HEADER" "${BOLD}" "$(echo -e "$message")" "${NC}"
+  printf "%s%s%b%s\n" "$HEADER" "${BOLD}" "$message" "${NC}"
 }
