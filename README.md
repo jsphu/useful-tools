@@ -9,7 +9,9 @@ Logger utility for scripts with color-coded language support
 ```sh
 . log.sh
 log -b BANNER -c (r|g|b|y|w|m|c) "Hello world! [R]this is a red text.[] now default color, [G]green text.[] etc."
-# works on log.bash, log.sh is not supports these yet.
+```
+
+```bash
 source log.bash # source first
 LOGQUIETMODE=0 # silence any log when set to 1
 LOGALWAYSCOLOR=0 # force color output when set to 1
@@ -17,6 +19,22 @@ LOGNOCOLOR=0 # force no color output when set to 1
 LOGLEVEL=0 # set levels to see upper level log messages
 log -l1 "Level 1" # won't seen on LOGLEVEL=0
 log -l2 "Level 2" # won't seen below LOGLEVEL=2 etc.
+```
+
+### logread
+
+Automatically reads and colorizes logs from stderr or stdout.
+
+```bash
+source log.bash # it comes from log.bash
+( ... ) 2> >(logread) # redirect stderr to logread
+{ ... } | logread # redirect stdout to logread
+... 2>&1 | logread # redirect both stdout and stderr to logread
+logread -c (r|g|b|y|w|m|c) # change default line color
+logread -l <NUMBER> # append to current log level
+logread -L <NUMBER> # change default line log level
+logread -e # suppress timestamp
+logread -b <BANNER> # set banner for each line
 ```
 
 ### `subtime`
