@@ -21,7 +21,7 @@ log -l1 "Level 1" # won't seen on LOGLEVEL=0
 log -l2 "Level 2" # won't seen below LOGLEVEL=2 etc.
 ```
 
-### logread
+### `logread`
 
 Automatically reads and colorizes logs from stderr or stdout.
 
