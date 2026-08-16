@@ -16,14 +16,13 @@ log() {
 
   local BANNER="${LOGBANNER:-$0}"
 
-  local OPTIND=1 COLOR="$BLU" column="" LEVEL=0 NEWLINE=$'\n' OUTPUT= REDIRECT_TO_STDERROR=false
-  while getopts ":hb:c:el:no:E" opt; do
+  local OPTIND=1 COLOR="$BLU" LEVEL=0 NEWLINE=$'\n' OUTPUT= REDIRECT_TO_STDERROR=false TIMESTAMP="${LOGTIMESTAMP}" ENABLE_BANNER=true ENABLE_HEADER=true FORCE_NO_COLOR=false
+  while getopts ":hb:c:el:no:O:Et:d" opt; do
     case "$opt" in
-    \-)
-      break
-      ;;
+    d) ENABLE_BANNER=false ;;
+    \-) break ;;
     h)
-      echo "Usage: log [-he] [-b BANNER] [-c COLOR] <message> <message>..."
+      echo "Usage: log [-heEnd] [-b BANNER] [-c COLOR] <message> <message>..."
       return 0
       ;;
     b) BANNER="$OPTARG" ;;
@@ -38,10 +37,15 @@ log() {
       *) COLOR="$NC" ;;
       esac
       ;;
-    e) BANNER="" COLOR="" ;;
+    t) TIMESTAMP="$OPTARG" ;;
+    e) ENABLE_HEADER=false ;;
     l) LEVEL="$OPTARG" ;;
     n) NEWLINE="" ;;
-    o) OUTPUT=">> $OPTARG" ;;
+    o) OUTPUT="$OPTARG" ;;
+    O)
+      OUTPUT="$OPTARG"
+      FORCE_NO_COLOR=true
+      ;;
     E) REDIRECT_TO_STDERROR=true ;;
     *)
       echo "Invalid option: -$OPTARG" >&2
@@ -55,6 +59,10 @@ log() {
     return 0
   fi
 
+  if "$FORCE_NO_COLOR" || [[ -f "$OUTPUT" && "$LOGALWAYSCOLOR" != "1" ]]; then
+    unset COLOR RED YLW GRN BLU MAG CYN BOLD NC
+  fi
+
   local message="$*"
 
   message="${message//\[R\]/${RED}}"
@@ -66,29 +74,51 @@ log() {
   message="${message//\[W\]/${NC}}"
   message="${message//\[\]/${COLOR}}"
 
-  local HEADER=""
   if [ -n "$BANNER" ]; then
-    if [ -n "$message" ]; then
-      column=": "
-    fi
-
-    LC_ALL=C printf -v TIMESTAMP "%(%d-%m-%Y %H:%M:%S)T.%s" "$EPOCHSECONDS" "${EPOCHREALTIME##*,}"
-
-    HEADER="${COLOR}[${TIMESTAMP}][${BANNER}]${column}"
+    BANNER="[$BANNER] "
   fi
 
-  if [ "$REDIRECT_TO_STDERROR" = true ]; then
-    printf "%s%s%b%s%b" "$HEADER" "${BOLD}" "$message" "${NC}" "$NEWLINE" ${OUTPUT} >&2
+  if [ -z "$TIMESTAMP" ]; then
+    LC_ALL=C printf -v TIMESTAMP \
+      "[%(%d-%m-%Y %H:%M:%S)T.%s%(%Z)T] " \
+      "$EPOCHSECONDS" "${EPOCHREALTIME##*,}"
+
+  elif [[ "$TIMESTAMP" =~ %\(.*\)T ]]; then
+    TIMESTAMP="${TIMESTAMP#'['}"
+    TIMESTAMP="${TIMESTAMP%']'}"
+    LC_ALL=C printf -v TIMESTAMP "[$TIMESTAMP] "
+
+  elif [[ "$TIMESTAMP" =~ % ]]; then
+    LC_ALL=C printf -v TIMESTAMP "[%(${TIMESTAMP})T] "
+
   else
-    printf "%s%s%b%s%b" "$HEADER" "${BOLD}" "$message" "${NC}" "$NEWLINE" ${OUTPUT}
+    TIMESTAMP=""
+  fi
+
+  local HEADER
+  if $ENABLE_HEADER; then
+
+    HEADER="${COLOR}${TIMESTAMP}"
+
+    if $ENABLE_BANNER; then
+      HEADER+="${BANNER}"
+    fi
+  fi
+
+  if "$REDIRECT_TO_STDERROR"; then
+    printf "%s%s%b%s%b" "$HEADER" "${BOLD}" "$message" "${NC}" "$NEWLINE" >&2 >>${OUTPUT:-/dev/stderr}
+  else
+    printf "%s%s%b%s%b" "$HEADER" "${BOLD}" "$message" "${NC}" "$NEWLINE" >>${OUTPUT:-/dev/stdout}
   fi
 }
 
 logread() {
   local OPTIND=1 LOGLINE="log " line= LEVEL=0 current_level=0
   local DEFAULT_LEVEL=0 DEFAULT_COLOR="B"
-  while getopts eEb:l:L:c: opt; do
+  while getopts eEb:l:L:c:t:d opt; do
     case "$opt" in
+    d) LOGLINE+=" -d " ;;
+    t) LOGLINE+=" -t $OPTARG " ;;
     e) LOGLINE+="-e " ;;
     E) LOGLINE+="-E " ;;
     b) LOGLINE+="-b $OPTARG " ;;
@@ -113,25 +143,48 @@ logread() {
     fi
 
     case "${line,,}" in
-    *warning* | *warn*)
+    *warn* | *caution* | *alert* | *notice* | \
+      *be\ careful* | *watch\ out* | *look\ out* | *heads\ up*)
       LOGLINE+="-cy "
       line="[Y]$line"
       ;;
-    *error* | *no\ *\ found* | *not\ found* | *err\ * | *no\ such* | *fail* | *fatal* | *not\ allowed* | *cannot* | *denied* | *permission*)
+    *error* | *no\ *\ found* | \
+      *not\ found* | *err\ * | \
+      *no\ such* | *fail* | *fatal* | \
+      *not\ allowed* | *cannot* | *denied* | \
+      *permission* | *invalid* | *exception* | *abort* | \
+      *crash* | *segmentation* | *core\ dumped* | \
+      *unhandled* | *unrecognized* | *not\ supported* | \
+      *not\ implemented* | *not\ available* | \
+      *not\ permitted* | *not\ authorized* | *not\ accessible* | \
+      *not\ reachable* | *not\ responding* | *not\ working* | \
+      *not\ functioning* | *not\ operational* | *not\ active* | \
+      *not\ running* | *not\ started* | *not\ initialized* | \
+      *not\ configured* | *not\ installed* | *not\ loaded* | \
+      *not\ connected* | *not\ detected* | *not\ recognized* | \
+      *refused* | *unauthorized* | *forbidden*)
       LOGLINE+="-cr "
       line="[R]$line"
       ;;
-    *info* | *\ tip* | *hint*)
+    *info* | *\ tip* | *hint* | *note* | *suggestion* | \
+      *recommendation* | *advice* | *guidance* | *instruction*)
       LOGLINE+="-cc "
       ((current_level++))
       line="[C]$line"
       ;;
-    *debug* | *trace*)
+    *debug* | *trace* | *verbose* | *detail* | \
+      *diagnostic* | *tracing*)
       LOGLINE+="-cm "
       ((current_level += 2))
       line="[M]$line"
       ;;
-    *success* | *\ ok\ * | *\ okay\ * | *done* | *succeed* | *complete* | *finished*)
+    *success* | *\ ok\ * | *\ okay\ * | *done* | \
+      *succeed* | *complete* | *finished* | \
+      *passed* | *verified* | *validated* | \
+      *confirmed* | *accepted* | *approved* | \
+      *enabled* | *activated* | *installed* | \
+      *loaded* | *connected* | *detected* | \
+      *recognized* | *reachable* | *responding*)
       LOGLINE+="-cg "
       line="[G]$line"
       ;;
